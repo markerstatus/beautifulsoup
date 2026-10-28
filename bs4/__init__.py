@@ -33,15 +33,14 @@ __all__ = [
     "Tag",
     "TemplateString",
     "ElementFilter",
+    "SoupReplacer",
     "UnicodeDammit",
     "CData",
     "Doctype",
-
     # Exceptions
     "FeatureNotFound",
     "ParserRejectedMarkup",
     "StopParsing",
-
     # Warnings
     "AttributeResemblesVariableWarning",
     "GuessedAtParserWarning",
@@ -90,6 +89,7 @@ from .element import (
 from .formatter import Formatter
 from .filter import (
     ElementFilter,
+    SoupReplacer,
     SoupStrainer,
 )
 from typing import (
@@ -180,6 +180,7 @@ class BeautifulSoup(Tag):
     is_xml: bool
     known_xml: Optional[bool]
     parse_only: Optional[SoupStrainer]  #: :meta private:
+    replacer: Optional[SoupReplacer]  #: :meta private:
 
     # These members are only used while parsing markup.
     markup: Optional[_RawMarkup]  #: :meta private:
@@ -215,6 +216,7 @@ class BeautifulSoup(Tag):
         from_encoding: Optional[_Encoding] = None,
         exclude_encodings: Optional[_Encodings] = None,
         element_classes: Optional[Dict[Type[PageElement], Type[PageElement]]] = None,
+        replacer: Optional[SoupReplacer] = None,
         **kwargs: Any,
     ):
         """Constructor.
@@ -254,6 +256,10 @@ class BeautifulSoup(Tag):
          like to be instantiated instead as the parse tree is
          built. This is useful for subclassing Tag or NavigableString
          to modify default behavior.
+
+        :param replacer: SoupReplacer. While the document is parsed,
+         each tag named ``og_tag`` is replaced as ``alt_tag`` instead.
+         The default: leaves tag names unchanged.
 
         :param kwargs: For backwards compatibility purposes, the
          constructor accepts certain keyword arguments used in
@@ -435,6 +441,7 @@ class BeautifulSoup(Tag):
         self.known_xml = self.is_xml
         self._namespaces = dict()
         self.parse_only = parse_only
+        self.replacer = replacer
 
         if hasattr(markup, "read"):  # It's a file-type object.
             markup = markup.read()
@@ -1018,6 +1025,9 @@ class BeautifulSoup(Tag):
         # print("Start tag %s: %s" % (name, attrs))
         self.endData()
 
+        if self.replacer is not None:
+            name = self.replacer.replace_tag(name)
+
         if (
             self.parse_only
             and len(self.tagStack) <= 1
@@ -1059,6 +1069,8 @@ class BeautifulSoup(Tag):
         :meta private:
         """
         # print("End tag: " + name)
+        if self.replacer is not None:
+            name = self.replacer.replace_tag(name)
         self.endData()
         self._popToTag(name, nsprefix)
 

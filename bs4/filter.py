@@ -680,3 +680,18 @@ class SoupStrainer(ElementFilter):
         :meta private:
         """
         return element if self.match(element) else None
+
+
+class SoupReplacer:
+    """Replace a tag with another tag.
+    e.g. : <b> -> <span>
+    """
+
+    def __init__(self, og_tag: str, alt_tag: str):
+        self.og_tag = og_tag
+        self.alt_tag = alt_tag
+
+    def replace_tag(self, name: str) -> str:
+        if name == self.og_tag:
+            return self.alt_tag
+        return name
