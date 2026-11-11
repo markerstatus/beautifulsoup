@@ -6,7 +6,7 @@ Run from the repository root:
 python3 ./apps/m3/task7.py ./doc.jp/index.html output.html
 ```
 
-It sets class="test" on all  tags
+It sets class="test" on all <p> tags
 
 ## SoupReplacer: Milestone 2 vs Milestone 3
 
