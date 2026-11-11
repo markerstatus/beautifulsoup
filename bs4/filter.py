@@ -685,13 +685,41 @@ class SoupStrainer(ElementFilter):
 class SoupReplacer:
     """Replace a tag with another tag.
     e.g. : <b> -> <span>
+
+    Pass ``og_tag`` and ``alt_tag`` to rename one tag name, or pass
+    functions that take the new `Tag`:
+
+    :param optional name_xformer: Returns the tag's new name.
+    :param optional attrs_xformer: Returns the tag's new attributes.
+    :param optional xformer: Changes the tag in place. Its return value is ignored.
     """
 
-    def __init__(self, og_tag: str, alt_tag: str):
+    def __init__(
+        self,
+        og_tag: Optional[str] = None,
+        alt_tag: Optional[str] = None,
+        name_xformer: Optional[Callable[[Tag], str]] = None,
+        attrs_xformer: Optional[Callable[[Tag], Dict[str, _AttributeValue]]] = None,
+        xformer: Optional[Callable[[Tag], None]] = None,
+    ):
+        if (og_tag is None) != (alt_tag is None):
+            raise ValueError("A pair of og_tag / alt_tag is missing.")
         self.og_tag = og_tag
         self.alt_tag = alt_tag
+        self.name_xformer = name_xformer
+        self.attrs_xformer = attrs_xformer
+        self.xformer = xformer
 
     def replace_tag(self, name: str) -> str:
-        if name == self.og_tag:
-            return self.alt_tag
+        if self.og_tag is not None and name == self.og_tag:
+            return cast(str, self.alt_tag)
         return name
+
+    def transform(self, tag: Tag) -> None:
+        """Apply the transformer functions to a newly created tag."""
+        if self.name_xformer is not None:
+            tag.name = self.name_xformer(tag)
+        if self.attrs_xformer is not None:
+            tag.attrs = cast(AttributeDict, self.attrs_xformer(tag))
+        if self.xformer is not None:
+            self.xformer(tag)

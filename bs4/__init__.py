@@ -181,6 +181,10 @@ class BeautifulSoup(Tag):
     known_xml: Optional[bool]
     parse_only: Optional[SoupStrainer]  #: :meta private:
     replacer: Optional[SoupReplacer]  #: :meta private:
+    # Maps id(tag) to the name a tag had before a SoupReplacer
+    # transformer renamed it. The end tag in the markup still uses
+    # that original name, so it is needed to map back.
+    _replaced_tag_names: Dict[int, str]
 
     # These members are only used while parsing markup.
     markup: Optional[_RawMarkup]  #: :meta private:
@@ -680,6 +684,7 @@ class BeautifulSoup(Tag):
         self.current_data = []
         self.currentTag = None
         self.tagStack = []
+        self._replaced_tag_names = {}
         self.open_tag_counter = Counter()
         self.preserve_whitespace_tag_stack = []
         self.string_container_stack = []
@@ -1054,6 +1059,14 @@ class BeautifulSoup(Tag):
         )
         if tag is None:
             return tag
+        if self.replacer is not None:
+            self.replacer.transform(tag)
+            if tag.name != name:
+                # The end tag in the markup still uses the original name,
+                # and name_xformer can't translate it because it needs a
+                # Tag, not a name. Remember the original name instead.
+                # So we save it by id, and turn it back to name later.
+                self._replaced_tag_names[id(tag)] = name
         if self._most_recent_element is not None:
             self._most_recent_element.next_element = tag
         self._most_recent_element = tag
@@ -1070,9 +1083,29 @@ class BeautifulSoup(Tag):
         """
         # print("End tag: " + name)
         if self.replacer is not None:
+            # The og_tag/alt_tag pair renames by name alone, so the end
+            # tag can be renamed the same way as the start tag.
             name = self.replacer.replace_tag(name)
         self.endData()
-        self._popToTag(name, nsprefix)
+        # _popToTag matches open tags by their current name, so it can't
+        # find a tag a transformer renamed. Only take the slower path
+        # when a tag has actually been renamed.
+        if self._replaced_tag_names:
+            self._popToReplacedTag(name, nsprefix)
+        else:
+            self._popToTag(name, nsprefix)
+
+    def _popToReplacedTag(self, name: str, nsprefix: Optional[str] = None) -> None:
+        """Like _popToTag, but matches each open tag by the name it had
+        before a SoupReplacer renamed it.
+        """
+        for i in range(len(self.tagStack) - 1, 0, -1):
+            t = self.tagStack[i]
+            original = self._replaced_tag_names.get(id(t), t.name)
+            if original == name and nsprefix == t.prefix:
+                while len(self.tagStack) > i:
+                    self.popTag()
+                return
 
     def handle_data(self, data: str) -> None:
         """Called by the tree builder when a chunk of textual data is
