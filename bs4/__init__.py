@@ -513,6 +513,14 @@ class BeautifulSoup(Tag):
         clone.original_encoding = self.original_encoding
         return clone
 
+    def __iter__(self) -> Iterator[PageElement]:
+        # Itr over every node in the parse tree
+        current = self.contents[0] if self.contents else None
+        while current is not None:
+            successor = current.next_element
+            yield current
+            current = successor
+
     def __getstate__(self) -> Dict[str, Any]:
         # Frequently a tree builder can't be pickled.
         d = dict(self.__dict__)
